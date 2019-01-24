@@ -23,7 +23,6 @@ import {
 
 // Set document.visibilityState to test flushBeforeTerminated
 Object.defineProperty(document, 'visibilityState', {value: 'hidden'});
-const visibilitychangeEvent = new Event('visibilitychange');
 
 /* Test helpers */
 function getApp(fetch: Fetch) {
@@ -43,7 +42,7 @@ function createMockFetch(responseParams: mixed): Response {
   };
 }
 
-test('Browser EventEmitter', async t => {
+test('Browser EventEmitter emits before termination', async t => {
   let fetched = false;
   let emitted = false;
   const fetch: Fetch = (url, options) => {
@@ -78,19 +77,17 @@ test('Browser EventEmitter', async t => {
   };
 
   const app = getApp(fetch);
-  app.middleware({events: UniversalEventsToken}, ({events}) => {
-    return (ctx, next) => {
-      const emitter = events.from(ctx);
-      t.equal(emitter, events);
-      emitter.on('a', ({x}) => {
-        t.equals(x, 1, 'payload is correct');
-        emitted = true;
-      });
-      emitter.emit('a', {x: 1});
-      window.dispatchEvent(visibilitychangeEvent);
-      emitter.teardown();
-      return next();
-    };
+  app.middleware({events: UniversalEventsToken}, ({events}) => (ctx, next) => {
+    const emitter = events.from(ctx);
+    t.equal(emitter, events);
+    emitter.on('a', ({x}) => {
+      t.equals(x, 1, 'payload is correct');
+      emitted = true;
+    });
+    emitter.emit('a', {x: 1});
+    window.dispatchEvent(new Event('visibilitychange'));
+    emitter.teardown();
+    return next();
   });
   const simulator = getSimulator(app);
   await simulator.render('/');
@@ -107,15 +104,12 @@ test('Browser EventEmitter adds events back to queue if they fail to send', asyn
   const fetch: Fetch = () => Promise.resolve(createMockFetch());
 
   const app = getApp(fetch);
-  app.middleware({events: UniversalEventsToken}, ({events}) => {
-    return (ctx, next) => {
-      const emitter = events.from(ctx);
-      t.equal(emitter, events);
-      emitter.emit('a', {x: 1});
-      window.dispatchEvent(visibilitychangeEvent);
-      emitter.teardown();
-      return next();
-    };
+  app.middleware({events: UniversalEventsToken}, ({events}) => (ctx, next) => {
+    const emitter = events.from(ctx);
+    t.equal(emitter, events);
+    emitter.emit('a', {x: 1});
+    emitter.teardown();
+    return next();
   });
   const simulator = getSimulator(app);
   await simulator.render('/');
@@ -130,15 +124,12 @@ test('Browser EventEmitter adds events back to queue if they fail to send 2', as
   const fetch: Fetch = () => Promise.reject();
 
   const app = getApp(fetch);
-  app.middleware({events: UniversalEventsToken}, ({events}) => {
-    return (ctx, next) => {
-      const emitter = events.from(ctx);
-      t.equal(emitter, events);
-      emitter.emit('a', {x: 1});
-      window.dispatchEvent(visibilitychangeEvent);
-      emitter.teardown();
-      return next();
-    };
+  app.middleware({events: UniversalEventsToken}, ({events}) => (ctx, next) => {
+    const emitter = events.from(ctx);
+    t.equal(emitter, events);
+    emitter.emit('a', {x: 1});
+    emitter.teardown();
+    return next();
   });
   const simulator = getSimulator(app);
   await simulator.render('/');
@@ -151,9 +142,7 @@ test('Browser EventEmitter adds events back to queue if they fail to send 2', as
 
 test('Browser EventEmitter interval', async t => {
   const emitter = new UniversalEmitter(
-    () => {
-      return Promise.resolve(createMockFetch({ok: true}));
-    },
+    () => Promise.resolve(createMockFetch({ok: true})),
     {
       add() {},
       addToStart() {},

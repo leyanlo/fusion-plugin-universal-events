@@ -23,7 +23,6 @@ import {
 } from './storage/index.js';
 
 export class UniversalEmitter extends Emitter {
-  flush: any;
   fetch: any;
   interval: any;
   storage: BatchStorage;
@@ -36,27 +35,24 @@ export class UniversalEmitter extends Emitter {
     super();
     //privates
     this.storage = storage;
-    this.flush = this.flushInternal.bind(this);
     this.fetch = fetch;
     this.setFrequency(interval);
     window.addEventListener('visibilitychange', this.flushBeforeTerminated);
   }
-  setFrequency(frequency: number): void {
+  setFrequency = (frequency: number): void => {
     window.clearInterval(this.interval);
     this.interval = setInterval(this.flush, frequency);
-  }
-  emit(type: mixed, payload: mixed): void {
+  };
+  emit = (type: mixed, payload: mixed): void => {
     payload = super.mapEvent(type, payload);
     super.handleEvent(type, payload);
     this.storage.add({type, payload});
-  }
+  };
   // match server api
-  from(): UniversalEmitter {
-    return this;
-  }
-  flushBeforeTerminated = () =>
-    document.visibilityState === 'hidden' && this.flushInternal();
-  async flushInternal(): Promise<void> {
+  from = (): UniversalEmitter => this;
+  flushBeforeTerminated = (): boolean =>
+    document.visibilityState === 'hidden' && !!this.flush();
+  flush = async (): Promise<void> => {
     const items = this.storage.getAndClear();
     if (items.length === 0) return;
 
@@ -77,12 +73,12 @@ export class UniversalEmitter extends Emitter {
       // sending failed so put the logs back into storage
       this.storage.addToStart(...items);
     }
-  }
-  teardown(): void {
+  };
+  teardown = (): void => {
     window.removeEventListener('visibilitychange', this.flushBeforeTerminated);
     clearInterval(this.interval);
     this.interval = null;
-  }
+  };
 }
 
 const plugin =
